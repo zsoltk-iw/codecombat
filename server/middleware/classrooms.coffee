@@ -362,3 +362,11 @@ module.exports =
     classroom.set('members', members)
     yield classroom.save()
     res.send(classroom.toObject({req}))
+
+  getByHandle: wrap (req, res) ->
+    classroom = yield database.getDocFromHandle(req, Classroom)
+    if not classroom
+      throw new errors.NotFound('Classroom not found.')
+    unless classroom.isOwner(req.user._id) or classroom.isMember(req.user._id) or req.user.isAdmin()
+      throw new errors.Forbidden('You do not have access to this classroom')
+    res.status(200).send(classroom.toObject({req}))
