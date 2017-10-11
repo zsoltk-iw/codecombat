@@ -403,15 +403,13 @@ describe 'GET /db/classroom/:handle/members', ->
     expect(res.body.length).toBe(1)
     expect(res.body[0]._id).toBe(@student.id)
     
-  # TODO: make this true
-  xit 'returns 403 unless you are the owner or a member of the classroom, or an admin', utils.wrap ->
+  it 'returns 403 unless you are the owner or a member of the classroom, or an admin', utils.wrap ->
     user = yield utils.initUser()
     yield utils.loginUser(user)
     [res] = yield request.getAsync({@url, json:true})
     expect(res.statusCode).toBe(403)
     
     yield utils.loginUser(@student)
-    yield utils.loginUser(user)
     [res] = yield request.getAsync({@url, json:true})
     expect(res.statusCode).toBe(200)
     
