@@ -324,3 +324,28 @@ module.exports =
     throw new errors.Unauthorized('You must be an administrator.') unless req.user?.isAdmin()
     classrooms = yield Classroom.find().select('ownerID members').lean()
     res.status(200).send(classrooms)
+
+  removeMember: wrap (req, res) ->
+    { userID } = req.body
+    unless utils.isID(userID)
+      throw new errors.UnprocessableEntity('Input must be a MongoDB ID')
+
+    classroom = yield database.getDocFromHandle(req, Classroom)
+    if not classroom
+      throw new errors.NotFound('Classroom not found.')
+
+    ownsClassroom = classroom.get('ownerID').equals(req.user._id)
+    removingSelf = userID is req.user.id
+
+    unless ownsClassroom or removingSelf
+      throw new errors.Forbidden('You may not remove someone other than yourself from the classroom')
+
+    alreadyNotInClassroom = not _.any classroom.get('members') or [], (memberID) -> memberID.toString() is userID
+    if alreadyNotInClassroom
+      return res.send(classroom.toObject({req}))
+
+    members = _.clone(classroom.get('members'))
+    members = (m for m in members when m.toString() isnt userID)
+    classroom.set('members', members)
+    yield classroom.save()
+    res.send(classroom.toObject({req}))

@@ -516,18 +516,35 @@ describe 'DELETE /db/classroom/:id/members', ->
     yield utils.clearModels([User, Classroom])
     @teacher = yield utils.initUser({role: 'teacher'})
     yield utils.loginUser(@teacher)
-    @student = yield utils.initUser()
-    @classroom = yield utils.makeClassroom({}, {members:[@student]})
+    @student1 = yield utils.initUser()
+    @student2 = yield utils.initUser()
+    @classroom = yield utils.makeClassroom({}, {members:[@student1, @student2]})
     @url = utils.getURL("/db/classroom/#{@classroom.id}/members")
     
 
-  it 'removes the given user from the list of members in the classroom', utils.wrap ->
-    expect(@classroom.get('members').length).toBe(1)
-    json = { userID: @student.id }
+  it 'idempotently removes the given user from the list of members in the classroom', utils.wrap ->
+    expect(@classroom.get('members').length).toBe(2)
+    json = { userID: @student1.id }
     [res, body] = yield request.delAsync { @url, json }
     expect(res.statusCode).toBe(200)
     classroom = yield Classroom.findById(@classroom.id)
-    expect(classroom.get('members').length).toBe(0)
+    expect(classroom.get('members').length).toBe(1)
+
+    [res, body] = yield request.delAsync { @url, json }
+    expect(res.statusCode).toBe(200)
+    classroom = yield Classroom.findById(@classroom.id)
+    expect(classroom.get('members').length).toBe(1)
+    
+  it 'returns 403 if one student tries to remove another, but students can remove themselves', utils.wrap ->
+    yield utils.loginUser(@student1)
+    json = { userID: @student2.id }
+    [res, body] = yield request.delAsync { @url, json }
+    expect(res.statusCode).toBe(403)
+
+    json = { userID: @student1.id }
+    [res, body] = yield request.delAsync { @url, json }
+    expect(res.statusCode).toBe(200)
+
     
 
 
