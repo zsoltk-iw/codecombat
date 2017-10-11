@@ -809,3 +809,71 @@ describe 'GET /db/course_instance/:handle/peer-projects', ->
     yield utils.loginUser(@teacher)
     [res, body] = yield request.getAsync({url, json: true})
     expect(res.statusCode).toBe(200)    
+
+    
+describe 'GET /db/course_instance/:handle/level_sessions', ->
+  beforeEach utils.wrap ->
+    @teacher = yield utils.initUser({role: 'teacher'})
+    @admin = yield utils.initAdmin()
+    @student = yield utils.initUser({role: 'student'})
+    yield utils.loginUser(@admin)
+    @level1 = yield utils.makeLevel({type: 'course'})
+    @level2 = yield utils.makeLevel({type: 'course'})
+    @level3 = yield utils.makeLevel({type: 'course'})
+    @campaign = yield utils.makeCampaign({}, {levels: [@level1, @level2]})
+    @course = yield utils.makeCourse({free: true, releasePhase: 'released'}, {campaign: @campaign})
+    @student1 = yield utils.initUser({role: 'student'})
+    @student2 = yield utils.initUser({role: 'student'})
+    @student3 = yield utils.initUser({role: 'student'})
+    members = [@student1, @student2]
+    yield utils.loginUser(@teacher)
+    @classroom = yield utils.makeClassroom({}, { members })
+    @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom, members })
+    
+    # should be returned (student 1/2 AND level 1/2)
+    @session1 = yield utils.makeLevelSession({}, {level: @level1, creator: @student1})
+    @session2 = yield utils.makeLevelSession({}, {level: @level2, creator: @student1})
+    @session3 = yield utils.makeLevelSession({}, {level: @level2, creator: @student2})
+    
+    # should not be returned (student 3 OR level 3)
+    @session4 = yield utils.makeLevelSession({}, {level: @level2, creator: @student3})
+    @session5 = yield utils.makeLevelSession({}, {level: @level3, creator: @student2})
+    
+    @url = utils.getUrl("/db/course_instance/#{@courseInstance.id}/level_sessions")
+  
+  it 'returns the level sessions for all levels and members of a given course instance', utils.wrap ->
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(200)
+    expect(res.body.length).toBe(3)
+    expect(_.find(res.body, {_id: @session1.id})).toBeTruthy()
+    expect(_.find(res.body, {_id: @session2.id})).toBeTruthy()
+    expect(_.find(res.body, {_id: @session3.id})).toBeTruthy()
+    expect(_.find(res.body, {_id: @session4.id})).toBeFalsy()
+    expect(_.find(res.body, {_id: @session5.id})).toBeFalsy()
+   
+  it 'returns 403 unless you are an owner or member of the classroom, or an admin', utils.wrap ->
+    user = yield utils.initUser()
+    yield utils.loginUser(user)
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student1)
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(200)
+
+    yield utils.loginUser(@student2)
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(200)
+
+    yield utils.loginUser(@student3)
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(403)
+    
+    yield utils.loginUser(@admin)
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(200)
+
+    yield utils.loginUser(@teacher)
+    [res] = yield request.getAsync({@url, json: true})
+    expect(res.statusCode).toBe(200)    
+    

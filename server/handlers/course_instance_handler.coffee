@@ -33,7 +33,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
 
   getByRelationship: (req, res, args...) ->
     relationship = args[1]
-    return @getLevelSessionsAPI(req, res, args[0]) if args[1] is 'level_sessions'
     return @removeMember(req, res, args[0]) if req.method is 'DELETE' and args[1] is 'members'
     return @getMembersAPI(req, res, args[0]) if args[1] is 'members'
     return @inviteStudents(req, res, args[0]) if relationship is 'invite_students'
@@ -93,27 +92,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     })
     doc.set('aceConfig', {}) # constructor will ignore empty objects
     return doc
-
-  getLevelSessionsAPI: (req, res, courseInstanceID) ->
-    return @sendUnauthorizedError(res) if not req.user?
-    CourseInstance.findById courseInstanceID, (err, courseInstance) =>
-      return @sendDatabaseError(res, err) if err
-      return @sendNotFoundError(res) unless courseInstance
-      Course.findById courseInstance.get('courseID'), (err, course) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendNotFoundError(res) unless course
-        Campaign.findById course.get('campaignID'), (err, campaign) =>
-          return @sendDatabaseError(res, err) if err
-          return @sendNotFoundError(res) unless campaign
-          levelIDs = (levelID for levelID of campaign.get('levels'))
-          memberIDs = _.map courseInstance.get('members') ? [], (memberID) -> memberID.toHexString?() or memberID
-          query = {$and: [{creator: {$in: memberIDs}}, {'level.original': {$in: levelIDs}}]}
-          cursor = LevelSession.find(query)
-          cursor = cursor.select(req.query.project) if req.query.project
-          cursor.exec (err, documents) =>
-            return @sendDatabaseError(res, err) if err?
-            cleandocs = (LevelSessionHandler.formatEntity(req, doc) for doc in documents)
-            @sendSuccess(res, cleandocs)
 
   getMembersAPI: (req, res, courseInstanceID) ->
     return @sendUnauthorizedError(res) if not req.user?

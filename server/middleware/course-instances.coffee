@@ -7,6 +7,7 @@ AnalyticsLogEvent = require '../models/AnalyticsLogEvent'
 TrialRequest = require '../models/TrialRequest'
 CourseInstance = require '../models/CourseInstance'
 Classroom = require '../models/Classroom'
+Campaign = require '../models/Campaign'
 Course = require '../models/Course'
 User = require '../models/User'
 Level = require '../models/Level'
@@ -263,3 +264,32 @@ module.exports =
       res.send(session.toObject({req}) for session in levelSessions)
     else
       res.send []
+
+
+  getLevelSessions: wrap (req, res) ->
+    courseInstance = yield database.getDocFromHandle(req, CourseInstance)
+    if not courseInstance
+      throw new errors.NotFound('Course Instance not found.')
+      
+    unless courseInstance.isMember(req.user._id) or courseInstance.isOwner(req.user._id) or req.user.isAdmin()
+      throw new errors.Forbidden('You do not have access to this course instance.')
+      
+    course = yield Course.findById(courseInstance.get('courseID'))
+    if not course
+      throw new errors.NotFound('Course not found.')
+
+    campaign = yield Campaign.findById(course.get('campaignID'))
+    if not campaign
+      throw new errors.NotFound('Campaign not found.')
+
+    levelIDs = (levelID for levelID of campaign.get('levels'))
+    memberIDs = _.map courseInstance.get('members') ? [], (memberID) -> memberID.toHexString?() or memberID
+    query = { $and: [
+      {creator: {$in: memberIDs}}
+      {'level.original': {$in: levelIDs}}
+    ]}
+    cursor = LevelSession.find(query)
+    cursor = cursor.select(req.query.project) if req.query.project
+    levelSessions = yield cursor.exec()
+    cleanLevelSessions = (levelSession.toObject({req}) for levelSession in levelSessions)
+    res.send(cleanLevelSessions)
