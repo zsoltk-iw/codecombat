@@ -6,7 +6,6 @@ module.exports.handlers =
   # 'analytics_users_active': 'handlers/analytics_users_active_handler'
   'article': 'handlers/article_handler'
   'clan': 'handlers/clan_handler'
-  'classroom': 'handlers/classroom_handler'
   'course': 'handlers/course_handler'
   'course_instance': 'handlers/course_instance_handler'
   'level': 'handlers/level_handler'
