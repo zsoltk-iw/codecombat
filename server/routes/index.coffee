@@ -105,7 +105,7 @@ module.exports.setup = (app) ->
   app.delete('/db/campaign/:handle/watchers', mw.patchable.leaveWatchers(Campaign))
 
   app.post('/db/classroom', mw.classrooms.post)
-  app.get('/db/classroom', mw.classrooms.fetchByCode, mw.classrooms.getByOwner)
+  app.get('/db/classroom', mw.classrooms.fetchByCode, mw.classrooms.getByOwner, mw.classrooms.getByMember)
   app.get('/db/classroom/:handle/levels', mw.classrooms.fetchAllLevels)
   app.get('/db/classroom/:handle/courses/:courseID/levels', mw.classrooms.fetchLevelsForCourse)
   app.post('/db/classroom/:handle/invite-members', mw.classrooms.inviteMembers)

@@ -32,17 +32,5 @@ ClassroomHandler = class ClassroomHandler extends Handler
       return doc.toObject()
     return _.omit(doc.toObject(), 'code', 'codeCamel')
 
-  get: (req, res) ->
-    if memberID = req.query.memberID
-      unless req.user and (req.user.isAdmin() or memberID is req.user.id)
-        log.debug "classroom_handler.get: memberID (#{memberID}) must be yourself (#{req.user?.id})"
-        return @sendForbiddenError(res)
-      return @sendBadInputError(res, 'Bad memberID') unless utils.isID memberID
-      Classroom.find {members: mongoose.Types.ObjectId(memberID)}, (err, classrooms) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendSuccess(res, (@formatEntity(req, classroom) for classroom in classrooms))
-    else
-      super(arguments...)
-
 
 module.exports = new ClassroomHandler()
