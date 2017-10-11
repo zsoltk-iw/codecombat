@@ -460,16 +460,16 @@ describe 'PUT /db/classroom/:handle', ->
     expect(body.description).toBe('New Description')
     
 
-  it 'is not allowed if you are just a member', utils.wrap ->
+  it 'returns 403 if you are not the owner', utils.wrap ->
     student = yield utils.initUser()
     yield utils.loginUser(student)
     joinUrl = getURL("/db/classroom/~/members")
     joinJson = { code: @classroom.get('code') }
-    [res, body] = yield request.postAsync { url: joinUrl, json: joinJson }
+    [res] = yield request.postAsync { url: joinUrl, json: joinJson }
     expect(res.statusCode).toBe(200)
 
     json = { name: 'New Name!', description: 'New Description' }
-    [res, body] = yield request.putAsync { @url, json }
+    [res] = yield request.putAsync { @url, json }
     expect(res.statusCode).toBe(403)
     
 
