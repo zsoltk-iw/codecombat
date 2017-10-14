@@ -312,9 +312,10 @@ describe 'DELETE /db/course_instance/:id/members', ->
     @level = yield utils.makeLevel({type: 'course'})
     @campaign = yield utils.makeCampaign({}, {levels: [@level]})
     @course = yield utils.makeCourse({free: true, releasePhase: 'released'}, {campaign: @campaign})
-    @student = yield utils.initUser({role: 'student'})
+    @student1 = yield utils.initUser({role: 'student'})
+    @student2 = yield utils.initUser({role: 'student'})
     @prepaid = yield utils.makePrepaid({creator: @teacher.id})
-    members = [@student]
+    members = [@student1, @student2]
     yield utils.loginUser(@teacher)
     @classroom = yield utils.makeClassroom({aceConfig: { language: 'javascript' }}, { members })
     @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom })
@@ -327,9 +328,10 @@ describe 'DELETE /db/course_instance/:id/members', ->
     [res, body] = yield request.postAsync {uri: url, json: data}
     @courseInstance = yield CourseInstance.findById res.body._id
 
-    # add user to course instance
+    # add users to course instance
     url = getURL("/db/course_instance/#{@courseInstance.id}/members")
-    [res, body] = yield request.postAsync {uri: url, json: {userID: @student.id}}
+    [res, body] = yield request.postAsync {uri: url, json: {userID: @student1.id}}
+    [res, body] = yield request.postAsync {uri: url, json: {userID: @student2.id}}
     @prepaid = yield new Prepaid({
       type: 'course'
       maxRedeemers: 10
@@ -339,22 +341,41 @@ describe 'DELETE /db/course_instance/:id/members', ->
 
   it 'removes a member to the given CourseInstance', utils.wrap (done) ->
     url = getURL("/db/course_instance/#{@courseInstance.id}/members")
-    [res, body] = yield request.delAsync {uri: url, json: {userID: @student.id}}
+    [res, body] = yield request.delAsync {uri: url, json: {userID: @student1.id}}
     expect(res.statusCode).toBe(200)
-    expect(res.body.members.length).toBe(0)
+    expect(res.body.members.length).toBe(1)
     done()
 
   it 'removes the CourseInstance from the User.courseInstances', utils.wrap (done) ->
     url = getURL("/db/course_instance/#{@courseInstance.id}/members")
-    user = yield User.findById(@student.id)
+    user = yield User.findById(@student1.id)
     expect(_.size(user.get('courseInstances'))).toBe(1)
-    [res, body] = yield request.delAsync {uri: url, json: {userID: @student.id}}
+    [res, body] = yield request.delAsync {uri: url, json: {userID: @student1.id}}
     expect(res.statusCode).toBe(200)
-    expect(res.body.members.length).toBe(0)
-    user = yield User.findById(@student.id)
+    expect(res.body.members.length).toBe(1)
+    user = yield User.findById(@student1.id)
     expect(_.size(user.get('courseInstances'))).toBe(0)
     done()
+    
+  it 'returns 403 unless you are removing yourself or you are the classroom owner', utils.wrap ->
+    url = getURL("/db/course_instance/#{@courseInstance.id}/members")
+    otherUser = yield utils.initUser()
+    yield utils.loginUser(otherUser)
+    [res, body] = yield request.delAsync {url, json: {userID: @student1.id}}
+    expect(res.statusCode).toBe(403)
 
+    yield utils.loginUser(@student1)
+    [res, body] = yield request.delAsync {url, json: {userID: @student2.id}}
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student2)
+    [res, body] = yield request.delAsync {url, json: {userID: @student2.id}}
+    expect(res.statusCode).toBe(200)
+
+    yield utils.loginUser(@teacher)
+    [res, body] = yield request.delAsync {url, json: {userID: @student1.id}}
+    expect(res.statusCode).toBe(200)
+    
 describe 'GET /db/course_instance/:handle/levels/:levelOriginal/next', ->
 
   beforeEach utils.wrap (done) ->

@@ -33,37 +33,11 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
 
   getByRelationship: (req, res, args...) ->
     relationship = args[1]
-    return @removeMember(req, res, args[0]) if req.method is 'DELETE' and args[1] is 'members'
     return @getMembersAPI(req, res, args[0]) if args[1] is 'members'
     return @inviteStudents(req, res, args[0]) if relationship is 'invite_students'
     return @redeemPrepaidCodeAPI(req, res) if args[1] is 'redeem_prepaid'
     return @findByLevel(req, res, args[2]) if args[1] is 'find_by_level'
     super arguments...
-
-  removeMember: (req, res, courseInstanceID) ->
-    return @sendUnauthorizedError(res) if not req.user?
-    userID = req.body.userID
-    return @sendBadInputError(res, 'Input must be a MongoDB ID') unless utils.isID(userID)
-    CourseInstance.findById courseInstanceID, (err, courseInstance) =>
-      return @sendDatabaseError(res, err) if err
-      return @sendNotFoundError(res, 'Course instance not found') unless courseInstance
-      Classroom.findById courseInstance.get('classroomID'), (err, classroom) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendNotFoundError(res, 'Classroom referenced by course instance not found') unless classroom
-        return @sendForbiddenError(res) unless _.any(classroom.get('members'), (memberID) -> memberID.toString() is userID)
-        ownsCourseInstance = courseInstance.get('ownerID').equals(req.user.get('_id'))
-        removingSelf = userID is req.user.id
-        return @sendForbiddenError(res) unless ownsCourseInstance or removingSelf
-        alreadyNotInCourseInstance = not _.any courseInstance.get('members') or [], (memberID) -> memberID.toString() is userID
-        return @sendSuccess(res, @formatEntity(req, courseInstance)) if alreadyNotInCourseInstance
-        members = _.clone(courseInstance.get('members'))
-        members = (m for m in members when m.toString() isnt userID)
-        courseInstance.set('members', members)
-        courseInstance.save (err, courseInstance) =>
-          return @sendDatabaseError(res, err) if err
-          User.update {_id: mongoose.Types.ObjectId(userID)}, {$pull: {courseInstances: courseInstance.get('_id')}}, (err) =>
-            return @sendDatabaseError(res, err) if err
-            @sendSuccess(res, @formatEntity(req, courseInstance))
 
   post: (req, res) ->
     return @sendUnauthorizedError(res) if not req.user?

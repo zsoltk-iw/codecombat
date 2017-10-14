@@ -293,3 +293,35 @@ module.exports =
     levelSessions = yield cursor.exec()
     cleanLevelSessions = (levelSession.toObject({req}) for levelSession in levelSessions)
     res.send(cleanLevelSessions)
+
+  
+  removeMember: wrap (req, res) ->
+    userID = req.body.userID
+    unless utils.isID(userID)
+      throw new errors.UnprocessableEntity('Input must be a MongoDB ID')
+
+    courseInstance = yield database.getDocFromHandle(req, CourseInstance)
+    if not courseInstance
+      throw new errors.NotFound('Course Instance not found.')
+
+    classroom = yield Classroom.findById courseInstance.get('classroomID')
+    if not classroom
+      throw new errors.NotFound('Classroom referenced by course instance not found')
+
+    ownsCourseInstance = courseInstance.get('ownerID').equals(req.user._id)
+    removingSelf = userID is req.user.id
+    unless ownsCourseInstance or removingSelf
+      throw new errors.Forbidden()
+
+    alreadyNotInCourseInstance = not _.any courseInstance.get('members') or [], (memberID) -> memberID.toString() is userID
+    if alreadyNotInCourseInstance
+      return res.send(courseInstance.toObject({req}))
+
+    members = _.clone(courseInstance.get('members'))
+    members = (m for m in members when m.toString() isnt userID)
+    courseInstance.set('members', members)
+    yield courseInstance.save()
+
+    yield User.update({_id: mongoose.Types.ObjectId(userID)}, {$pull: {courseInstances: courseInstance.get('_id')}})
+    return res.send(courseInstance.toObject({req}))
+    
