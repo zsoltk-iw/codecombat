@@ -21,7 +21,7 @@ classroomsURL = getURL('/db/classroom')
 describe 'GET /db/classroom?ownerID=:id', ->
 
   beforeEach utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @user1 = yield utils.initUser()
     yield utils.loginUser(@user1)
     @classroom1 = yield new Classroom({name: 'Classroom 1', ownerID: @user1.get('_id') }).save()
@@ -44,7 +44,7 @@ describe 'GET /db/classroom?ownerID=:id', ->
 
 describe 'GET /db/classroom?memberID=:id', ->
   beforeEach utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @teacher = yield utils.initUser({role: 'teacher'})
     @user1 = yield utils.initUser()
     @user2 = yield utils.initUser()
@@ -74,7 +74,7 @@ describe 'GET /db/classroom?memberID=:id', ->
     
 describe 'GET /db/classroom?code=code', ->
   beforeEach utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @teacher = yield utils.initUser({role: 'teacher'})
     yield utils.loginUser(@teacher)
     @classroom1 = yield utils.makeClassroom()
@@ -92,6 +92,7 @@ describe 'GET /db/classroom?code=code', ->
 
 describe 'GET /db/classroom/:handle', ->
   beforeEach utils.wrap ->
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @student = yield utils.initUser({role: 'student'})
     @teacher = yield utils.initUser({role: 'teacher'})
     yield utils.loginUser(@teacher)
@@ -135,6 +136,7 @@ describe 'GET /db/classroom/:handle', ->
 
 describe 'GET /db/classroom by classCode', ->
   it 'Returns the class if you include spaces', utils.wrap ->
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     user = yield utils.initUser()
     yield utils.loginUser(user)
     teacher = yield utils.initUser()
@@ -415,6 +417,7 @@ describe 'GET /db/classroom/:handle/levels', ->
 
 describe 'GET /db/classroom/:handle/members', ->
   beforeEach utils.wrap ->
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @student = yield utils.initUser({role: 'student'})
     @teacher = yield utils.initUser({role: 'teacher'})
     yield utils.loginUser(@teacher)
@@ -446,7 +449,7 @@ describe 'GET /db/classroom/:handle/members', ->
 describe 'PUT /db/classroom/:handle', ->
 
   beforeEach utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     teacher = yield utils.initUser({role: 'teacher'})
     yield utils.loginUser(teacher)
     @classroom = yield utils.makeClassroom()
@@ -537,7 +540,7 @@ describe 'POST /db/classroom/-/members', ->
 describe 'DELETE /db/classroom/:id/members', ->
 
   beforeEach utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @teacher = yield utils.initUser({role: 'teacher'})
     yield utils.loginUser(@teacher)
     @student1 = yield utils.initUser()
@@ -575,6 +578,7 @@ describe 'DELETE /db/classroom/:id/members', ->
 describe 'POST /db/classroom/:id/invite-members', ->
 
   it 'takes a list of emails and sends invites', utils.wrap (done) ->
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     user = yield utils.initUser({role: 'teacher', name: 'Mr Professerson'})
     yield utils.loginUser(user)
     classroom = yield utils.makeClassroom()
@@ -649,7 +653,7 @@ describe 'GET /db/classroom/:handle/member-sessions', ->
 describe 'GET /db/classroom/:handle/members', ->
 
   beforeEach utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     @teacher = yield utils.initUser()
     @student1 = yield utils.initUser({ name: "Firstname Lastname", firstName: "Firstname", lastName: "L", coursePrepaid: { _id: mongoose.Types.ObjectId() } })
     @student2 = yield utils.initUser({ name: "Student Nameynamington", firstName: "Student", lastName: "N" })
@@ -692,7 +696,7 @@ describe 'GET /db/classroom/:handle/members', ->
 
 describe 'POST /db/classroom/:classroomID/members/:memberID/reset-password', ->
   it 'changes the password', utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     teacher = yield utils.initUser()
     yield utils.loginUser(teacher)
     student = yield utils.initUser({ name: "Firstname Lastname" })
@@ -709,7 +713,7 @@ describe 'POST /db/classroom/:classroomID/members/:memberID/reset-password', ->
     
 
   it "doesn't change the password if you're not their teacher", utils.wrap ->
-    yield utils.clearModels([User, Classroom])
+    yield utils.clearModels([User, Classroom, Course, Campaign])
     teacher = yield utils.initUser()
     yield utils.loginUser(teacher)
     student = yield utils.initUser({ name: "Firstname Lastname" })
