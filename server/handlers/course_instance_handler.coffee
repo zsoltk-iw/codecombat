@@ -33,7 +33,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
 
   getByRelationship: (req, res, args...) ->
     relationship = args[1]
-    return @getMembersAPI(req, res, args[0]) if args[1] is 'members'
     return @inviteStudents(req, res, args[0]) if relationship is 'invite_students'
     return @redeemPrepaidCodeAPI(req, res) if args[1] is 'redeem_prepaid'
     return @findByLevel(req, res, args[2]) if args[1] is 'find_by_level'
@@ -66,17 +65,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     })
     doc.set('aceConfig', {}) # constructor will ignore empty objects
     return doc
-
-  getMembersAPI: (req, res, courseInstanceID) ->
-    return @sendUnauthorizedError(res) if not req.user?
-    CourseInstance.findById courseInstanceID, (err, courseInstance) =>
-      return @sendDatabaseError(res, err) if err
-      return @sendNotFoundError(res) unless courseInstance
-      memberIDs = courseInstance.get('members') ? []
-      User.find {_id: {$in: memberIDs}}, (err, users) =>
-        return @sendDatabaseError(res, err) if err
-        cleandocs = (UserHandler.formatEntity(req, doc) for doc in users)
-        @sendSuccess(res, cleandocs)
 
   inviteStudents: (req, res, courseInstanceID) ->
     return @sendUnauthorizedError(res) if not req.user?

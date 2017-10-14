@@ -91,9 +91,76 @@ describe 'POST /db/course_instance', ->
     }
     [res, body] = yield request.postAsync {uri: url, json: data}
     expect(res.statusCode).toBe(403)
+    
+    
+describe 'GET /db/course_instance/:handle/members', ->
+  beforeEach utils.wrap ->
+    yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])
 
+    # create teacher, student, course, classroom and course instance
+    @teacher = yield utils.initUser({role: 'teacher'})
+    admin = yield utils.initAdmin()
+    yield utils.loginUser(admin)
+    @level = yield utils.makeLevel({type: 'course'})
+    @course = yield utils.makeCourse({free: true, releasePhase: 'released'})
+    @student1 = yield utils.initUser({role: 'student'})
+    @student2 = yield utils.initUser({role: 'student'})
+    @student3 = yield utils.initUser({role: 'student'})
+    @prepaid = yield utils.makePrepaid({creator: @teacher.id})
+    members = [@student1, @student2]
+    yield utils.loginUser(@teacher)
+    @classroom = yield utils.makeClassroom({aceConfig: { language: 'javascript' }}, { members })
+    @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom })
+    url = getURL('/db/course_instance')
+    data = {
+      name: 'Some Name'
+      courseID: @course.id
+      classroomID: @classroom.id
+    }
+    [res, body] = yield request.postAsync {uri: url, json: data}
+    @courseInstance = yield CourseInstance.findById res.body._id
 
-describe 'POST /db/course_instance/:id/members', ->
+    # add users to course instance
+    url = getURL("/db/course_instance/#{@courseInstance.id}/members")
+    [res, body] = yield request.postAsync {uri: url, json: {userID: @student1.id}}
+    [res, body] = yield request.postAsync {uri: url, json: {userID: @student2.id}}
+    @prepaid = yield new Prepaid({
+      type: 'course'
+      maxRedeemers: 10
+      redeemers: []
+    }).save()
+    
+    @url = getURL("/db/course_instance/#{@courseInstance.id}/members")
+    
+  it 'returns all users in the course instance', utils.wrap ->
+    [res] = yield request.getAsync {@url, json: true}
+    expect(res.statusCode).toBe(200)
+    expect(res.body.length).toBe(2)
+    expect(_.find(res.body, {_id: @student1.id})).toBeTruthy()
+    expect(_.find(res.body, {_id: @student2.id})).toBeTruthy()
+    expect(_.find(res.body, {_id: @student3.id})).toBeFalsy()
+    
+  it 'returns 403 if you are not an owner or member of the course instance', utils.wrap ->
+    user = yield utils.initUser()
+    yield utils.loginUser(user)
+    [res] = yield request.getAsync {@url, json: true}
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student3)
+    [res] = yield request.getAsync {@url, json: true}
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student1)
+    [res] = yield request.getAsync {@url, json: true}
+    expect(res.statusCode).toBe(200)
+    
+    yield utils.loginUser(@teacher)
+    [res] = yield request.getAsync {@url, json: true}
+    expect(res.statusCode).toBe(200)
+    
+  
+
+describe 'POST /db/course_instance/:handle/members', ->
 
   beforeEach utils.wrap ->
     yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid, Campaign, Level])
@@ -274,7 +341,7 @@ describe 'POST /db/course_instance/:id/members', ->
       expect(classroom.get('courses')[1]._id.toString()).toEqual(@course2.id)
       expect(classroom.get('courses')[1].levels[0].original).toEqual(@level3.get('original'))
 
-describe 'DELETE /db/course_instance/:id/members', ->
+describe 'DELETE /db/course_instance/:handle/members', ->
 
   beforeEach utils.wrap ->
     yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])

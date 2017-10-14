@@ -324,4 +324,18 @@ module.exports =
 
     yield User.update({_id: mongoose.Types.ObjectId(userID)}, {$pull: {courseInstances: courseInstance.get('_id')}})
     return res.send(courseInstance.toObject({req}))
+
+
+  fetchMembers: wrap (req, res) ->
+    courseInstance = yield database.getDocFromHandle(req, CourseInstance)
+    if not courseInstance
+      throw new errors.NotFound('Course Instance not found.')
+
+    unless courseInstance.isMember(req.user._id) or courseInstance.isOwner(req.user._id) or req.user.isAdmin()
+      throw new errors.Forbidden('You do not have access to this course instance.')
+
+    memberIDs = courseInstance.get('members') ? []
+    users = yield User.find {_id: {$in: memberIDs}}
+    cleandocs = (user.toObject({req}) for user in users)
+    res.send(cleandocs)
     
