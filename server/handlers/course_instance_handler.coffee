@@ -33,7 +33,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
 
   getByRelationship: (req, res, args...) ->
     relationship = args[1]
-    return @redeemPrepaidCodeAPI(req, res) if args[1] is 'redeem_prepaid'
     return @findByLevel(req, res, args[2]) if args[1] is 'find_by_level'
     super arguments...
 
@@ -64,44 +63,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     })
     doc.set('aceConfig', {}) # constructor will ignore empty objects
     return doc
-
-  redeemPrepaidCodeAPI: (req, res) ->
-    return @sendUnauthorizedError(res) if not req.user? or req.user?.isAnonymous()
-    return @sendBadInputError(res) unless req.body?.prepaidCode
-
-    prepaidCode = req.body?.prepaidCode
-    Prepaid.find code: prepaidCode, (err, prepaids) =>
-      return @sendDatabaseError(res, err) if err
-      return @sendNotFoundError(res) if prepaids.length < 1
-      return @sendDatabaseError(res, "Multiple prepaid codes found for #{prepaidCode}") if prepaids.length > 1
-      prepaid = prepaids[0]
-
-      CourseInstance.find prepaidID: prepaid.get('_id'), (err, courseInstances) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendForbiddenError(res) if prepaid.get('redeemers')?.length >= prepaid.get('maxRedeemers')
-
-        if _.find((prepaid.get('redeemers') ? []), (a) -> a.userID.equals(req.user.id))
-          return @sendSuccess(res, courseInstances)
-
-        # Add to prepaid redeemers
-        query =
-          _id: prepaid.get('_id')
-          'redeemers.userID': { $ne: req.user.get('_id') }
-          $where: "this.redeemers.length < #{prepaid.get('maxRedeemers')}"
-        update = { $push: { redeemers : { date: new Date(), userID: req.user.get('_id') } }}
-        Prepaid.update query, update, (err, result) =>
-          return @sendDatabaseError(res, err) if err
-          if result?.nModified is 0
-            @logError(req.user, "Course instance update prepaid lost race on maxRedeemers")
-            return @sendForbiddenError(res)
-
-          # Add to each course instance
-          makeAddMemberToCourseInstanceFn = (courseInstance) =>
-            (done) => courseInstance.update({$addToSet: { members: req.user.get('_id')}}, done)
-          tasks = (makeAddMemberToCourseInstanceFn(courseInstance) for courseInstance in courseInstances)
-          async.parallel tasks, (err, results) =>
-            return @sendDatabaseError(res, err) if err
-            @sendSuccess(res, courseInstances)
 
   findByLevel: (req, res, levelOriginal) ->
     return @sendUnauthorizedError(res) if not req.user?
