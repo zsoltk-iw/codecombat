@@ -338,4 +338,34 @@ module.exports =
     users = yield User.find {_id: {$in: memberIDs}}
     cleandocs = (user.toObject({req}) for user in users)
     res.send(cleandocs)
-    
+
+
+  inviteStudents: wrap (req, res) ->
+    return @sendUnauthorizedError(res) if not req.user?
+    if not req.body.emails
+      return @sendBadInputError(res, 'Emails not included')
+    CourseInstance.findById courseInstanceID, (err, courseInstance) =>
+      return @sendDatabaseError(res, err) if err
+      return @sendNotFoundError(res) unless courseInstance
+      return @sendForbiddenError(res) unless @hasAccessToDocument(req, courseInstance)
+
+      Course.findById courseInstance.get('courseID'), (err, course) =>
+        return @sendDatabaseError(res, err) if err
+        return @sendNotFoundError(res) unless course
+
+        Prepaid.findById courseInstance.get('prepaidID'), (err, prepaid) =>
+          return @sendDatabaseError(res, err) if err
+          return @sendNotFoundError(res) unless prepaid
+          return @sendForbiddenError(res) unless prepaid.get('maxRedeemers') > prepaid.get('redeemers').length
+          for email in req.body.emails
+            context =
+              email_id: sendwithus.templates.course_invite_email
+              recipient:
+                address: email
+              subject: course.get('name')
+              email_data:
+                teacher_name: req.user.broadName()
+                class_name: course.get('name')
+                join_link: "https://codecombat.com/courses/students?_ppc=" + prepaid.get('code')
+            sendwithus.api.send context, _.noop
+          return @sendSuccess(res, {})
