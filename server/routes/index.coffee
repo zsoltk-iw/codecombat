@@ -152,6 +152,7 @@ module.exports.setup = (app) ->
   app.post('/db/course/:handle/patch', mw.auth.checkLoggedIn(), mw.patchable.postPatch(Course, 'course'))
   app.get('/db/course/:handle/patches', mw.patchable.patches(Course))
 
+  app.get('/db/course_instance', mw.courseInstances.getByOwner)
   app.get('/db/course_instance/-/non-hoc', mw.auth.checkHasPermission(['admin']), mw.courseInstances.fetchNonHoc)
   app.post('/db/course_instance/-/recent', mw.auth.checkHasPermission(['admin']), mw.courseInstances.fetchRecent)
   app.get('/db/course_instance/:handle/levels/:levelOriginal/sessions/:sessionID/next', mw.courseInstances.fetchNextLevel)

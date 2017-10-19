@@ -93,6 +93,46 @@ describe 'POST /db/course_instance', ->
     expect(res.statusCode).toBe(403)
     
     
+describe 'GET /db/course_instance?ownerID=ownerID', ->
+  beforeEach utils.wrap ->
+    yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])
+
+    # create teacher, student, course, classroom and course instance
+    @teacher = yield utils.initUser({role: 'teacher'})
+    @teacher2 = yield utils.initUser({role: 'teacher'})
+    @admin = yield utils.initAdmin()
+    yield utils.loginUser(@admin)
+    @course = yield utils.makeCourse({free: true, releasePhase: 'released'})
+    yield utils.loginUser(@teacher)
+    @classroom = yield utils.makeClassroom({aceConfig: { language: 'javascript' }})
+    @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom })
+
+    yield utils.loginUser(@teacher2)
+    @classroom2 = yield utils.makeClassroom({aceConfig: { language: 'javascript' }})
+    @courseInstance2 = yield utils.makeCourseInstance({}, { @course, classroom: @classroom2 })
+    @url = utils.getUrl('/db/course_instance')
+
+  it 'fetches all course instances owned by the given owner', utils.wrap ->
+    yield utils.loginUser(@teacher)
+    [res] = yield request.getAsync({@url, json: true, qs: {ownerID: @teacher.id}})
+    expect(res.statusCode).toBe(200)
+    expect(res.body.length).toBe(1)
+    expect(res.body[0]._id).toBe(@courseInstance.id)
+    
+  it 'returns 403 unless you are an admin or the owner', utils.wrap ->
+    yield utils.loginUser(@teacher)
+    [res] = yield request.getAsync({@url, json: true, qs: {ownerID: @teacher2.id}})
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@teacher)
+    [res] = yield request.getAsync({@url, json: true, qs: {ownerID: @teacher.id}})
+    expect(res.statusCode).toBe(200)
+
+    yield utils.loginUser(@admin)
+    [res] = yield request.getAsync({@url, json: true, qs: {ownerID: @teacher.id}})
+    expect(res.statusCode).toBe(200)
+    
+    
 describe 'GET /db/course_instance/:handle/members', ->
   beforeEach utils.wrap ->
     yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])

@@ -31,11 +31,6 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     return true if req.method is 'GET' and _.find document?.get('members'), (a) -> a.equals(req.user?.get('_id'))
     req.user?.isAdmin()
 
-  getByRelationship: (req, res, args...) ->
-    relationship = args[1]
-    return @findByLevel(req, res, args[2]) if args[1] is 'find_by_level'
-    super arguments...
-
   post: (req, res) ->
     return @sendUnauthorizedError(res) if not req.user?
     return @sendBadInputError(res, 'No classroomID') unless req.body.classroomID
@@ -64,32 +59,8 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     doc.set('aceConfig', {}) # constructor will ignore empty objects
     return doc
 
-  findByLevel: (req, res, levelOriginal) ->
-    return @sendUnauthorizedError(res) if not req.user?
-    # Find all CourseInstances that req.user is a part of that match the given level.
-    CourseInstance.find {_id: {$in: req.user.get('courseInstances')}},  (err, courseInstances) =>
-      return @sendDatabaseError res, err if err
-      return @sendSuccess res, [] unless courseInstances.length
-      courseIDs = _.uniq (ci.get('courseID') for ci in courseInstances)
-      Course.find {_id: {$in: courseIDs}}, {name: 1, campaignID: 1}, (err, courses) =>
-        return @sendDatabaseError res, err if err
-        return @sendSuccess res, [] unless courses.length
-        campaignIDs = _.uniq (c.get('campaignID') for c in courses)
-        Campaign.find {_id: {$in: campaignIDs}, "levels.#{levelOriginal}": {$exists: true}}, {_id: 1}, (err, campaigns) =>
-          return @sendDatabaseError res, err if err
-          return @sendSuccess res, [] unless campaigns.length
-          courses = _.filter courses, (course) -> _.find campaigns, (campaign) -> campaign.get('_id').toString() is course.get('campaignID').toString()
-          courseInstances = _.filter courseInstances, (courseInstance) -> _.find courses, (course) -> course.get('_id').toString() is courseInstance.get('courseID').toString()
-          return @sendSuccess res, courseInstances
-
   get: (req, res) ->
-    if ownerID = req.query.ownerID
-      return @sendForbiddenError(res) unless req.user and (req.user.isAdmin() or ownerID is req.user.id)
-      return @sendBadInputError(res, 'Bad ownerID') unless utils.isID ownerID
-      CourseInstance.find {ownerID: mongoose.Types.ObjectId(ownerID)}, (err, courseInstances) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendSuccess(res, (@formatEntity(req, courseInstance) for courseInstance in courseInstances))
-    else if memberID = req.query.memberID
+    if memberID = req.query.memberID
       return @sendForbiddenError(res) unless req.user and (req.user.isAdmin() or memberID is req.user.id)
       return @sendBadInputError(res, 'Bad memberID') unless utils.isID memberID
       CourseInstance.find {members: mongoose.Types.ObjectId(memberID)}, (err, courseInstances) =>

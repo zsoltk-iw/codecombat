@@ -354,3 +354,18 @@ module.exports =
     courses = _.filter courses, (course) -> _.find campaigns, (campaign) -> campaign.get('_id').toString() is course.get('campaignID').toString()
     courseInstances = _.filter courseInstances, (courseInstance) -> _.find courses, (course) -> course.get('_id').toString() is courseInstance.get('courseID').toString()
     res.send((ci.toObject({req}) for ci in courseInstances))
+
+    
+  getByOwner: wrap (req, res, next) ->
+    { ownerID } = req.query
+    unless ownerID
+      return next()
+
+    unless req.user and (req.user.isAdmin() or ownerID is req.user.id)
+      throw new errors.Forbidden()
+
+    unless utils.isID ownerID
+      throw new errors.UnprocessableEntity('Bad ownerID')
+
+    courseInstances = yield CourseInstance.find {ownerID: mongoose.Types.ObjectId(ownerID)}
+    res.send((courseInstance.toObject({req}) for courseInstance in courseInstances))
