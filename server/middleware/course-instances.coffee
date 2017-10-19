@@ -340,32 +340,17 @@ module.exports =
     res.send(cleandocs)
 
 
-  inviteStudents: wrap (req, res) ->
-    return @sendUnauthorizedError(res) if not req.user?
-    if not req.body.emails
-      return @sendBadInputError(res, 'Emails not included')
-    CourseInstance.findById courseInstanceID, (err, courseInstance) =>
-      return @sendDatabaseError(res, err) if err
-      return @sendNotFoundError(res) unless courseInstance
-      return @sendForbiddenError(res) unless @hasAccessToDocument(req, courseInstance)
-
-      Course.findById courseInstance.get('courseID'), (err, course) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendNotFoundError(res) unless course
-
-        Prepaid.findById courseInstance.get('prepaidID'), (err, prepaid) =>
-          return @sendDatabaseError(res, err) if err
-          return @sendNotFoundError(res) unless prepaid
-          return @sendForbiddenError(res) unless prepaid.get('maxRedeemers') > prepaid.get('redeemers').length
-          for email in req.body.emails
-            context =
-              email_id: sendwithus.templates.course_invite_email
-              recipient:
-                address: email
-              subject: course.get('name')
-              email_data:
-                teacher_name: req.user.broadName()
-                class_name: course.get('name')
-                join_link: "https://codecombat.com/courses/students?_ppc=" + prepaid.get('code')
-            sendwithus.api.send context, _.noop
-          return @sendSuccess(res, {})
+  findByLevel: wrap (req, res) ->
+    # Find all CourseInstances that req.user is a part of that match the given level.
+    levelOriginal = req.params.levelOriginal
+    courseInstances = yield CourseInstance.find {_id: {$in: req.user.get('courseInstances')}}
+    res.send([]) unless courseInstances.length
+    courseIDs = _.uniq (ci.get('courseID') for ci in courseInstances)
+    courses = yield Course.find {_id: {$in: courseIDs}}, {name: 1, campaignID: 1}
+    res.send([]) unless courses.length
+    campaignIDs = _.uniq (c.get('campaignID') for c in courses)
+    campaigns = yield Campaign.find {_id: {$in: campaignIDs}, "levels.#{levelOriginal}": {$exists: true}}, {_id: 1}
+    res.send([]) unless campaigns.length
+    courses = _.filter courses, (course) -> _.find campaigns, (campaign) -> campaign.get('_id').toString() is course.get('campaignID').toString()
+    courseInstances = _.filter courseInstances, (courseInstance) -> _.find courses, (course) -> course.get('_id').toString() is courseInstance.get('courseID').toString()
+    res.send((ci.toObject({req}) for ci in courseInstances))

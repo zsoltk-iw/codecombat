@@ -913,3 +913,29 @@ describe 'GET /db/course_instance/:handle/level_sessions', ->
     [res] = yield request.getAsync({@url, json: true})
     expect(res.statusCode).toBe(200)    
     
+    
+describe 'GET /db/course_instance/-/find_by_level/:levelOriginal', ->
+  beforeEach utils.wrap ->
+    yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid, Campaign, Level])
+    @teacher = yield utils.initUser({role: 'teacher'})
+    @admin = yield utils.initAdmin()
+    yield utils.loginUser(@admin)
+    @level1 = yield utils.makeLevel()
+    @level2 = yield utils.makeLevel()
+    @campaign = yield utils.makeCampaign({}, {levels: [@level1, @level2]})
+    @course = yield utils.makeCourse({free: true, releasePhase: 'released'}, {campaign: @campaign})
+    @student = yield utils.initUser({role: 'student'})
+    members = [@student]
+    yield utils.loginUser(@teacher)
+    @classroom = yield utils.makeClassroom({aceConfig: { language: 'javascript' }}, { members })
+    @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom })
+    url = utils.getURL("/db/course_instance/#{@courseInstance.id}/members")
+    [res, body] = yield request.postAsync {uri: url, json: {userID: @student.id}}
+    
+  it 'fetches all course instances the logged in user is a member of and include the given level', utils.wrap ->
+    yield utils.loginUser(@student)
+    url = utils.getUrl("/db/course_instance/-/find_by_level/#{@level1.get('original')}")
+    [res] = yield request.getAsync({url, json: true})
+    expect(res.statusCode).toBe(200)
+    expect(res.body.length).toBe(1)
+    expect(res.body[0]._id).toBe(@courseInstance.id)
