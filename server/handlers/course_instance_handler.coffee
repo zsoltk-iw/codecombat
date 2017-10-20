@@ -31,32 +31,4 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     return true if req.method is 'GET' and _.find document?.get('members'), (a) -> a.equals(req.user?.get('_id'))
     req.user?.isAdmin()
 
-  post: (req, res) ->
-    return @sendUnauthorizedError(res) if not req.user?
-    return @sendBadInputError(res, 'No classroomID') unless req.body.classroomID
-    return @sendBadInputError(res, 'No courseID') unless req.body.courseID
-    Classroom.findById req.body.classroomID, (err, classroom) =>
-      return @sendDatabaseError(res, err) if err
-      return @sendNotFoundError(res, 'Classroom not found') unless classroom
-      return @sendForbiddenError(res) unless classroom.get('ownerID').equals(req.user.get('_id'))
-      Course.findById req.body.courseID, (err, course) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendNotFoundError(res, 'Course not found') unless course
-        q = {
-          courseID: mongoose.Types.ObjectId(req.body.courseID)
-          classroomID: mongoose.Types.ObjectId(req.body.classroomID)
-        }
-        CourseInstance.findOne(q).exec (err, doc) =>
-          return @sendDatabaseError(res, err) if err
-          return @sendSuccess(res, @formatEntity(req, doc)) if doc
-          super(req, res)
-
-  makeNewInstance: (req) ->
-    doc = new CourseInstance({
-      members: []
-      ownerID: req.user.get('_id')
-    })
-    doc.set('aceConfig', {}) # constructor will ignore empty objects
-    return doc
-
 module.exports = new CourseInstanceHandler()
