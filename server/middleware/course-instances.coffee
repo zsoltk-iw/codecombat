@@ -361,7 +361,10 @@ module.exports =
     unless ownerID
       return next()
 
-    unless req.user and (req.user.isAdmin() or ownerID is req.user.id)
+    unless req.user
+      throw new errors.Unauthorized()
+
+    unless req.user.isAdmin() or ownerID is req.user.id
       throw new errors.Forbidden()
 
     unless utils.isID ownerID
@@ -373,11 +376,39 @@ module.exports =
     
   getByMember: wrap (req, res, next) ->
     { memberID } = req.query
-    unless req.user and (req.user.isAdmin() or memberID is req.user.id)
+    if not memberID
+      return next()
+
+    unless req.user
+      throw new errors.Unauthorized()
+      
+    unless req.user.isAdmin() or memberID is req.user.id
       throw new errors.Forbidden()
 
     unless utils.isID memberID
       throw new errors.UnprocessableEntity('Bad memberID')
 
     courseInstances = yield CourseInstance.find {members: mongoose.Types.ObjectId(memberID)}
+    res.send((courseInstance.toObject({req}) for courseInstance in courseInstances))
+    
+    
+  getByClassroom: wrap (req, res, next) ->
+    { classroomID } = req.query
+    if not classroomID
+      return next()
+
+    unless req.user
+      throw new errors.Unauthorized()
+      
+    unless utils.isID classroomID
+      throw new errors.UnprocessableEntity(res, 'Bad classroomID')
+
+    classroom = yield Classroom.findById classroomID
+    unless classroom
+      throw new errors.NotFound()
+
+    unless classroom.isMember(req.user._id) or classroom.isOwner(req.user._id) or req.user.isAdmin()
+      throw new errors.Forbidden()
+
+    courseInstances = yield CourseInstance.find {classroomID: mongoose.Types.ObjectId(classroomID)}
     res.send((courseInstance.toObject({req}) for courseInstance in courseInstances))
