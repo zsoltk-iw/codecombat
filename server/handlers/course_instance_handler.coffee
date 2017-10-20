@@ -60,13 +60,7 @@ CourseInstanceHandler = class CourseInstanceHandler extends Handler
     return doc
 
   get: (req, res) ->
-    if memberID = req.query.memberID
-      return @sendForbiddenError(res) unless req.user and (req.user.isAdmin() or memberID is req.user.id)
-      return @sendBadInputError(res, 'Bad memberID') unless utils.isID memberID
-      CourseInstance.find {members: mongoose.Types.ObjectId(memberID)}, (err, courseInstances) =>
-        return @sendDatabaseError(res, err) if err
-        return @sendSuccess(res, (@formatEntity(req, courseInstance) for courseInstance in courseInstances))
-    else if classroomID = req.query.classroomID
+    if classroomID = req.query.classroomID
       return @sendForbiddenError(res) unless req.user
       return @sendBadInputError(res, 'Bad memberID') unless utils.isID classroomID
       Classroom.findById classroomID, (err, classroom) =>

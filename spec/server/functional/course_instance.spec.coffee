@@ -131,6 +131,53 @@ describe 'GET /db/course_instance?ownerID=ownerID', ->
     yield utils.loginUser(@admin)
     [res] = yield request.getAsync({@url, json: true, qs: {ownerID: @teacher.id}})
     expect(res.statusCode).toBe(200)
+
+
+describe 'GET /db/course_instance?memberID=memberID', ->
+  beforeEach utils.wrap ->
+    yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])
+
+    # create teacher, student, course, classroom and course instance
+    @teacher = yield utils.initUser({role: 'teacher'})
+    @student1 = yield utils.initUser({role: 'student'})
+    @student2 = yield utils.initUser({role: 'student'})
+    @admin = yield utils.initAdmin()
+    yield utils.loginUser(@admin)
+    @course = yield utils.makeCourse({free: true, releasePhase: 'released'})
+    yield utils.loginUser(@teacher)
+    @classroom = yield utils.makeClassroom({aceConfig: { language: 'javascript' }}, { members:[@student1, @student2] })
+    @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom, members:[@student1, @student2] })
+    @classroom2 = yield utils.makeClassroom({aceConfig: { language: 'javascript' }}, {  members: [@student1, @student2] })
+    @courseInstance2 = yield utils.makeCourseInstance({}, { @course, classroom: @classroom2, members: [@student1] })
+    @url = utils.getUrl('/db/course_instance')
+
+  it 'fetches all course instances the given user is a member of', utils.wrap ->
+    yield utils.loginUser(@student1)
+    [res] = yield request.getAsync({@url, json: true, qs: {memberID: @student1.id}})
+    expect(res.statusCode).toBe(200)
+    expect(res.body.length).toBe(2)
+    expect(_.find(res.body, {_id:@courseInstance.id})).toBeTruthy()
+    expect(_.find(res.body, {_id:@courseInstance2.id})).toBeTruthy()
+
+    yield utils.loginUser(@student2)
+    [res] = yield request.getAsync({@url, json: true, qs: {memberID: @student2.id}})
+    expect(res.statusCode).toBe(200)
+    expect(res.body.length).toBe(1)
+    expect(_.find(res.body, {_id:@courseInstance.id})).toBeTruthy()
+    expect(_.find(res.body, {_id:@courseInstance2.id})).toBeFalsy()
+
+  it 'returns 403 unless you are an admin or the member', utils.wrap ->
+    yield utils.loginUser(@teacher)
+    [res] = yield request.getAsync({@url, json: true, qs: {memberID: @student1.id}})
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student1)
+    [res] = yield request.getAsync({@url, json: true, qs: {memberID: @student2.id}})
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@admin)
+    [res] = yield request.getAsync({@url, json: true, qs: {memberID: @student1.id}})
+    expect(res.statusCode).toBe(200)
     
     
 describe 'GET /db/course_instance/:handle/members', ->

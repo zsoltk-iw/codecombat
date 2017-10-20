@@ -369,3 +369,15 @@ module.exports =
 
     courseInstances = yield CourseInstance.find {ownerID: mongoose.Types.ObjectId(ownerID)}
     res.send((courseInstance.toObject({req}) for courseInstance in courseInstances))
+
+    
+  getByMember: wrap (req, res, next) ->
+    { memberID } = req.query
+    unless req.user and (req.user.isAdmin() or memberID is req.user.id)
+      throw new errors.Forbidden()
+
+    unless utils.isID memberID
+      throw new errors.UnprocessableEntity('Bad memberID')
+
+    courseInstances = yield CourseInstance.find {members: mongoose.Types.ObjectId(memberID)}
+    res.send((courseInstance.toObject({req}) for courseInstance in courseInstances))
