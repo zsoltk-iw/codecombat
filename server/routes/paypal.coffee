@@ -12,8 +12,10 @@ module.exports.setup = (app) ->
   app.post '/paypal/webhook', expressWrap (req, res) ->
     try
       if req.body.event_type is "PAYMENT.SALE.COMPLETED"
+        log.info "PayPal webhook event #{req.body.event_type} received"
         yield handlePaymentSucceeded(req, res)
       else if req.body.event_type is "BILLING.SUBSCRIPTION.CANCELLED"
+        log.info "PayPal webhook event #{req.body.event_type} received"
         yield handleSubscriptionCancelled(req, res)
       else
         log.info "PayPal webhook unknown event #{req.body.event_type}"
@@ -47,6 +49,14 @@ module.exports.setup = (app) ->
     return res.status(200).send("Payment already recorded for #{payPalSalePayment.id}") if payment
 
     billingAgreementID = payPalSalePayment.billing_agreement_id
+
+    # Check for initial subscribe payment and add sale object
+    payment = yield Payment.findOne({'payPalBillingAgreementID': billingAgreementID, 'payPalSale': {$exists: false}})
+    if payment
+      payment.set('payPalSale', payPalSalePayment)
+      yield payment.save()
+      return res.status(200).send("Payment sale object #{payPalSalePayment.id} added to initial payment #{payment.id}")
+
     user = yield User.findOne({'payPal.billingAgreementID': billingAgreementID})
     unless user
       log.error "PayPal webhook payment no user found: #{payPalSalePayment.id} #{billingAgreementID}"
@@ -73,6 +83,13 @@ module.exports.setup = (app) ->
     })
     yield payment.save()
 
+    # Add gems to User
+    purchased = _.cloneDeep(user.get('purchased') ? {})
+    purchased.gems ?= 0
+    purchased.gems += gems if gems
+    user.set('purchased', purchased)
+    yield user.save()
+
     return res.status(200).send()
 
 
@@ -88,9 +105,6 @@ module.exports.setup = (app) ->
       log.error("PayPal webhook subscription cancellation, no billing agreement for #{billingAgreementID}")
       return res.status(200).send("PayPal webhook subscription cancellation, no billing agreement for #{billingAgreementID}")
 
-    userPayPalData = _.clone(user.get('payPal') ? {})
-    delete userPayPalData.billingAgreementID
-    userPayPalData.cancelDate = new Date()
-    user.set('payPal', userPayPalData)
-    yield user.save()
+    yield user.cancelPayPalSubscription()
+
     return res.status(200).send()

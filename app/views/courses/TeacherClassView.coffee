@@ -225,14 +225,19 @@ module.exports = class TeacherClassView extends RootView
 
   calculateProgressAndLevels: ->
     return unless @supermodel.progress is 1 and @allStatsLoaded()
+    userLevelCompletedMap = @classroom.sessions.models.reduce((map, session) =>
+      if session.completed()
+        map[session.get('creator')] ?= {}
+        map[session.get('creator')][session.get('level').original.toString()] = true
+      map
+    , {})
     # TODO: How to structure this in @state?
     for student in @students.models
       # TODO: this is a weird hack
       studentsStub = new Users([ student ])
-      student.latestCompleteLevel = helper.calculateLatestComplete(@classroom, @courses, @courseInstances, studentsStub)
-
+      student.latestCompleteLevel = helper.calculateLatestComplete(@classroom, @courses, @courseInstances, studentsStub, userLevelCompletedMap)
     earliestIncompleteLevel = helper.calculateEarliestIncomplete(@classroom, @courses, @courseInstances, @students)
-    latestCompleteLevel = helper.calculateLatestComplete(@classroom, @courses, @courseInstances, @students)
+    latestCompleteLevel = helper.calculateLatestComplete(@classroom, @courses, @courseInstances, @students, userLevelCompletedMap)
 
     classroomsStub = new Classrooms([ @classroom ])
     progressData = helper.calculateAllProgress(classroomsStub, @courses, @courseInstances, @students)

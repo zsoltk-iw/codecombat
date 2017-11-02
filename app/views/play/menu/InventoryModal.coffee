@@ -314,6 +314,9 @@ module.exports = class InventoryModal extends ModalView
   onClickSubscribeItemViewed: (e) ->
     return @askToSignUp() if me.get('anonymous')
     @openModalView new SubscribeModal()
+    itemElem = @$el.find('.item.active')
+    item = @items.get(itemElem?.data('item-id'))
+    window.tracker?.trackEvent 'Show subscription modal', category: 'Subscription', label: 'inventory modal: ' + (item?.get('slug') or 'unknown')
 
   #- Select/equip higher-level, all encompassing methods the callbacks all use
 
@@ -601,11 +604,11 @@ module.exports = class InventoryModal extends ModalView
     patchMe ||= not _.isEqual inventory, lastHeroConfig.inventory
     lastHeroConfig.inventory = inventory
     if patchMe
-      console.log 'setting me.heroConfig to', JSON.stringify(lastHeroConfig)
+      console.log 'Inventory Modal: setting me.heroConfig to', JSON.stringify(lastHeroConfig)
       me.set 'heroConfig', lastHeroConfig
       me.patch()
     if patchSession
-      console.log 'setting session.heroConfig to', JSON.stringify(sessionHeroConfig)
+      console.log 'Inventory Modal: setting session.heroConfig to', JSON.stringify(sessionHeroConfig)
       @options.session.set 'heroConfig', sessionHeroConfig
       @options.session.patch success: callback unless skipSessionSave
     else

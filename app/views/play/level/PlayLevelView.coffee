@@ -110,7 +110,7 @@ module.exports = class PlayLevelView extends RootView
     @courseInstanceID = options.courseInstanceID or @getQueryVariable 'course-instance'
 
     @isEditorPreview = @getQueryVariable 'dev'
-    @sessionID = @getQueryVariable 'session'
+    @sessionID = (@getQueryVariable 'session') || @options.sessionID
     @observing = @getQueryVariable 'observing'
 
     @opponentSessionID = @getQueryVariable('opponent')
@@ -148,6 +148,7 @@ module.exports = class PlayLevelView extends RootView
     levelLoaderOptions = { @supermodel, @levelID, @sessionID, @opponentSessionID, team: @getQueryVariable('team'), @observing, @courseID, @courseInstanceID }
     if me.isSessionless()
       levelLoaderOptions.fakeSessionConfig = {}
+    console.debug 'PlayLevelView: Create LevelLoader'
     @levelLoader = new LevelLoader levelLoaderOptions
     @listenToOnce @levelLoader, 'world-necessities-loaded', @onWorldNecessitiesLoaded
     @listenTo @levelLoader, 'world-necessity-load-failed', @onWorldNecessityLoadFailed
@@ -213,6 +214,7 @@ module.exports = class PlayLevelView extends RootView
   # Partially Loaded Setup ####################################################
 
   onWorldNecessitiesLoaded: ->
+    console.debug('PlayLevelView: world necessities loaded')
     # Called when we have enough to build the world, but not everything is loaded
     @grabLevelLoaderData()
     team = @getQueryVariable('team') ?  @session.get('team') ? @world?.teamForPlayer(0) ? 'humans'
@@ -348,6 +350,7 @@ module.exports = class PlayLevelView extends RootView
   # Load Completed Setup ######################################################
 
   onSessionLoaded: (e) ->
+    console.log 'PlayLevelView: loaded session', e.session
     return if @session
     Backbone.Mediator.publish "ipad:language-chosen", language: e.session.get('codeLanguage') ? "python"
     # Just the level and session have been loaded by the level loader
@@ -356,43 +359,6 @@ module.exports = class PlayLevelView extends RootView
       if e.session.get('creator') is '532dbc73a622924444b68ed9'  # Wizard Dude gets his own avatar
         sorcerer = '53e126a4e06b897606d38bef'
       e.session.set 'heroConfig', {"thangType":sorcerer,"inventory":{"misc-0":"53e2396a53457600003e3f0f","programming-book":"546e266e9df4a17d0d449be5","minion":"54eb5dbc49fa2d5c905ddf56","feet":"53e214f153457600003e3eab","right-hand":"54eab7f52b7506e891ca7202","left-hand":"5463758f3839c6e02811d30f","wrists":"54693797a2b1f53ce79443e9","gloves":"5469425ca2b1f53ce7944421","torso":"546d4a549df4a17d0d449a97","neck":"54693274a2b1f53ce79443c9","eyes":"546941fda2b1f53ce794441d","head":"546d4ca19df4a17d0d449abf"}}
-    # TODO: Remove post-KR
-    else if e.level.get('slug') is 'the-gauntlet-kr'
-      lightseeker = '583d2cca6ffa3e65d170f29f'
-      e.session.set 'heroConfig', {"thangType":lightseeker,"inventory":{
-        "feet":"53e237bf53457600003e3f05",
-        "head":"546d38269df4a17d0d4499ff",
-        "eyes":"53e238df53457600003e3f0b",
-        "torso":"53e22eac53457600003e3efc",
-        "right-hand":"53e218d853457600003e3ebe",
-        "programming-book":"53e4108204c00d4607a89f78"
-      }}
-    else if e.level.get('slug') is 'woodland-cleaver-kr'
-      lightseeker = '583d2cca6ffa3e65d170f29f'
-      e.session.set 'heroConfig', {"thangType":lightseeker,"inventory":{
-        "eyes": "53e238df53457600003e3f0b",
-        "head": "546d38269df4a17d0d4499ff",
-        "torso": "545d3f0b2d03e700001b5a5d",
-        "right-hand": "544d7d1f8494308424f564a3",
-        "wrists": "53e2396a53457600003e3f0f",
-        "programming-book": "546e25d99df4a17d0d449be1",
-        "left-hand": "544c310ae0017993fce214bf"
-      }}
-    else if e.level.get('slug') is 'crossroads-kr'
-      lightseeker = '583d2cca6ffa3e65d170f29f'
-      e.session.set 'heroConfig', {"thangType":lightseeker,"inventory":{
-        "wrists": "53e2396a53457600003e3f0f",
-        "eyes": "53e2167653457600003e3eb3",
-        "feet": "546d4d589df4a17d0d449ac9",
-        "left-hand": "544d7bb88494308424f56493",
-        "right-hand": "54694ba3a2b1f53ce794444d",
-        "waist": "5437002a7beba4a82024a97d",
-        "programming-book": "546e25d99df4a17d0d449be1",
-        "gloves": "5469425ca2b1f53ce7944421",
-        "head": "546d390b9df4a17d0d449a0b",
-        "torso": "546aaf1b3777d6186329285e",
-        "neck": "54693140a2b1f53ce79443bc"
-      }}
     else if e.level.get('slug') in ['ace-of-coders', 'elemental-wars']
       goliath = '55e1a6e876cb0948c96af9f8'
       e.session.set 'heroConfig', {"thangType":goliath,"inventory":{
@@ -488,6 +454,7 @@ module.exports = class PlayLevelView extends RootView
 
   onLevelStarted: ->
     return unless @surface? or @webSurface?
+    console.log 'PlayLevelView: level started'
     @loadingView.showReady()
     @trackLevelLoadEnd()
     if window.currentModal and not window.currentModal.destroyed and [VictoryModal, CourseVictoryModal].indexOf(window.currentModal.constructor) is -1

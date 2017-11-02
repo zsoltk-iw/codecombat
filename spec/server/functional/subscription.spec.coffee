@@ -1434,7 +1434,17 @@ describe 'POST /db/user/:handle/paypal', ->
           expect(res.statusCode).toBe(404)
 
       describe 'when token passed', ->
-
+        beforeEach utils.wrap ->
+          @product = yield Product.findOne({name: 'basic_subscription'})
+          unless @product
+            @localProduct = true
+            @product = Product({name: 'basic_subscription', gems: 20, amount: 30})
+            yield @product.save()
+          # else
+          #   console.log '@product exists', @product
+        afterEach utils.wrap ->
+          if @localProduct
+            yield Product.remove({_id: @product.get('_id')})
         it 'subscribes the user', utils.wrap ->
           expect(@user.hasSubscription()).not.toBeTruthy()
           url = utils.getUrl("/db/user/#{@user.id}/paypal/execute-billing-agreement")
@@ -1449,6 +1459,12 @@ describe 'POST /db/user/:handle/paypal', ->
           expect(userPayPalData.subscribeDate).toBeDefined()
           expect(userPayPalData.subscribeDate).toBeLessThan(new Date())
           expect(user.hasSubscription()).toBeTruthy()
+          payment = yield Payment.findOne payPalBillingAgreementID: userPayPalData.billingAgreementID
+          expect(payment).toBeDefined()
+          expect(payment.get('recipient').toString()).toEqual(user.id)
+          expect(payment.get('amount')).toEqual(@product.get('amount'))
+          expect(payment.get('gems')).toEqual(@product.get('gems'))
+          expect(user.get('purchased').gems).toEqual(@product.get('gems'))
 
   describe '/cancel-billing-agreement', ->
     beforeEach utils.wrap ->
@@ -1495,7 +1511,8 @@ describe 'POST /db/user/:handle/paypal', ->
           expect(user.get('payPal').billingAgreementID).not.toBeDefined()
           expect(user.get('payPal').cancelDate).toBeDefined()
           expect(user.get('payPal').cancelDate).toBeLessThan(new Date())
-          expect(user.hasSubscription()).not.toBeTruthy()
+          expect(user.hasSubscription()).toBeTruthy()
+          expect(new Date(user.get('stripe').free)).toBeGreaterThan(new Date())
 
 describe 'POST /paypal/webhook', ->
   beforeEach utils.wrap ->
@@ -1604,19 +1621,23 @@ describe 'POST /paypal/webhook', ->
 
         describe 'when basic_subscription product exists for user', ->
           beforeEach utils.wrap ->
-            yield Product({name: 'basic_subscription'}).save()
+            @product = Product({name: 'basic_subscription', gems: 20})
+            yield @product.save()
 
           describe 'when no previous payment recorded', ->
             beforeEach utils.wrap ->
               yield utils.clearModels([Payment])
 
-            it 'creates a new payment', utils.wrap ->
+            it 'creates a new payment and awards gems', utils.wrap ->
               url = getURL('/paypal/webhook')
               [res, body] = yield request.postAsync({ uri: url, json: @paymentEventData })
               expect(res.statusCode).toEqual(200)
               payment = yield Payment.findOne({'payPalSale.id': @paymentEventData.resource.id})
               expect(payment).toBeTruthy()
               expect(payment.get('purchaser').toString()).toEqual(@user.id)
+              expect(payment.get('amount')).toEqual(Math.round(parseFloat(@paymentEventData.resource.amount.total) * 100))
+              user = yield User.findById(payment.get('purchaser'))
+              expect(user.get('purchased').gems).toBeDefined() # Products in db are not predictable for this test suite
 
           describe 'when previous payment already recorded', ->
             beforeEach utils.wrap ->
@@ -1632,6 +1653,42 @@ describe 'POST /paypal/webhook', ->
               expect(res.body).toEqual("Payment already recorded for #{@paymentEventData.resource.id}")
               payments = yield Payment.find({'payPalSale.id': @paymentEventData.resource.id}).lean()
               expect(payments?.length).toEqual(1)
+
+          describe 'when initial subscribe payment already recorded', ->
+            beforeEach utils.wrap ->
+              yield utils.clearModels([Payment])
+              @payment = yield Payment({'payPalBillingAgreementID': @paymentEventData.resource.billing_agreement_id}).save()
+              payments = yield Payment.find({'payPalBillingAgreementID': @paymentEventData.resource.billing_agreement_id}).lean()
+              expect(payments?.length).toEqual(1)
+
+            it 'does not create a new payment and updates the existing one for the corresponding webhook call', utils.wrap ->
+              url = getURL('/paypal/webhook')
+              [res, body] = yield request.postAsync({ uri: url, json: @paymentEventData })
+              expect(res.statusCode).toEqual(200)
+              expect(res.body).toEqual("Payment sale object #{@paymentEventData.resource.id} added to initial payment #{@payment.id}")
+              payments = yield Payment.find({'payPalSale.id': @paymentEventData.resource.id}).lean()
+              expect(payments?.length).toEqual(1)
+              expect(payments[0].payPalBillingAgreementID).toEqual(@paymentEventData.resource.billing_agreement_id)
+
+            describe 'when initial subscribe payment already updated from webhook', ->
+              beforeEach utils.wrap ->
+                url = getURL('/paypal/webhook')
+                [res, body] = yield request.postAsync({ uri: url, json: @paymentEventData })
+                expect(res.statusCode).toEqual(200)
+                expect(res.body).toEqual("Payment sale object #{@paymentEventData.resource.id} added to initial payment #{@payment.id}")
+                payments = yield Payment.find({'payPalSale.id': @paymentEventData.resource.id}).lean()
+                expect(payments?.length).toEqual(1)
+                expect(payments[0].payPalBillingAgreementID).toEqual(@paymentEventData.resource.billing_agreement_id)
+
+              it 'creates a 2nd payment for month 2 recurring payment', utils.wrap ->
+                secondPaymentData = _.cloneDeep(@paymentEventData)
+                secondPaymentData.resource.id += 'second'
+                url = getURL('/paypal/webhook')
+                [res, body] = yield request.postAsync({ uri: url, json: secondPaymentData })
+                expect(res.statusCode).toEqual(200)
+                payments = yield Payment.find({'payPalSale.id': secondPaymentData.resource.id}).lean()
+                expect(payments?.length).toEqual(1)
+                expect(payments[0].payPalBillingAgreementID).not.toBeDefined()
 
   describe 'when BILLING.SUBSCRIPTION.CANCELLED event', ->
     beforeEach utils.wrap ->
@@ -1801,4 +1858,5 @@ describe 'POST /paypal/webhook', ->
         expect(res.statusCode).toEqual(200)
         user = yield User.findById @user.id
         expect(user.get('payPal.billingAgreementID')).not.toBeDefined()
-        expect(user.hasSubscription()).not.toBeTruthy()
+        expect(user.hasSubscription()).toBeTruthy()
+        expect(new Date(user.get('stripe').free)).toBeGreaterThan(new Date())

@@ -432,6 +432,7 @@
     back_to_map: "Back to Map"
     directions: "Directions"
     edit_level: "Edit Level"
+    keep_learning: "Keep Learning"
     explore_codecombat: "Explore CodeCombat"
     finished_hoc: "I'm finished with my Hour of Code"
     get_certificate: "Get your certificate!"
@@ -580,6 +581,17 @@
     view_gallery: "View Gallery"
     project_published_noty: "Your level has been published!"
     keep_editing: "Keep Editing"
+    
+  amazon_hoc:
+    title: "Keep Learning with Amazon!"
+    congrats: "Congratulations on conquering that challenging Hour of Code!"
+    educate_1: "Now, keep learning about coding and cloud computing with AWS Educate, an exciting, free program from Amazon for both students and teachers. With AWS Educate, you can earn cool badges as you learn about the basics of the cloud and cutting-edge technologies such as gaming, virtual reality, and Alexa."
+    educate_2: "Learn more and sign up here"
+    future_eng_1: "You can also try to build your own school facts skill for Alexa"
+    future_eng_2: "here"
+    future_eng_3: "(device is not required). This Alexa activity is brought to you by the"
+    future_eng_4: "Amazon Future Engineer"
+    future_eng_5: "program which creates learning and work opportunities for all K-12 students in the United States who wish to pursue computer science."
 
   play_game_dev_level:
     created_by: "Created by {{name}}"
@@ -1590,6 +1602,9 @@
     gd1_guide_desc: "Use this to guide your students as they create their first shareable game project in 5 days."
     gd1_rubric: "Game Development 1 - Project Rubric"
     gd1_rubric_desc: "Use this rubric to assess student projects at the end of Game Development 1."
+    gd2: "Game Development 2"
+    gd2_curriculum: "Game Development 2 - Curriculum Guide"
+    gd2_curriculum_desc: "Lesson plans for Game Development 2."
     wd1: "Web Development 1"
     wd1_headlines: "Headlines & Headers Activity"
     wd1_headlines_example: "View sample solution"
