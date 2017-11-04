@@ -97,6 +97,47 @@ describe 'POST /db/course_instance', ->
     expect(res.statusCode).toBe(403)
     
     
+describe 'GET /db/course_instance/:handle', ->
+  beforeEach utils.wrap ->
+    yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])
+
+    # create teacher, student, course, classroom and course instance
+    @teacher1 = yield utils.initUser({role: 'teacher'})
+    @teacher2 = yield utils.initUser({role: 'teacher'})
+    @student1 = yield utils.initUser({role: 'student'})
+    @student2 = yield utils.initUser({role: 'student'})
+    @admin = yield utils.initAdmin()
+    yield utils.loginUser(@admin)
+    @course = yield utils.makeCourse({free: true, releasePhase: 'released'})
+    yield utils.loginUser(@teacher1)
+    @classroom = yield utils.makeClassroom({aceConfig: { language: 'javascript' }}, { members:[@student1, @student2] })
+    @courseInstance = yield utils.makeCourseInstance({}, { @course, @classroom, members:[@student1] })
+    @url = utils.getUrl("/db/course_instance/#{@courseInstance.id}")
+    
+  it 'returns the course instance', utils.wrap ->
+    yield utils.loginUser(@teacher1)
+    [res] = yield request.getAsync({ @url, json: true })
+    expect(res.statusCode).toBe(200)
+    expect(res.body._id).toBe(@courseInstance.id)
+    
+  it 'returns 403 unless you are an admin, the owner or a member of the classroom', utils.wrap ->
+    yield utils.loginUser(@teacher2)
+    [res] = yield request.getAsync({ @url, json: true })
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student2)
+    [res] = yield request.getAsync({ @url, json: true })
+    expect(res.statusCode).toBe(403)
+
+    yield utils.loginUser(@student1)
+    [res] = yield request.getAsync({ @url, json: true })
+    expect(res.statusCode).toBe(200)
+
+    yield utils.loginUser(@admin)
+    [res] = yield request.getAsync({ @url, json: true })
+    expect(res.statusCode).toBe(200)
+    
+    
 describe 'GET /db/course_instance?ownerID=ownerID', ->
   beforeEach utils.wrap ->
     yield utils.clearModels([CourseInstance, Course, User, Classroom, Prepaid])

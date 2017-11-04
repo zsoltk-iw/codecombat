@@ -169,6 +169,7 @@ module.exports.setup = (app) ->
   app.get('/db/course_instance', mw.courseInstances.getByOwner, mw.courseInstances.getByMember, mw.courseInstances.getByClassroom)
   app.get('/db/course_instance/-/non-hoc', mw.auth.checkHasPermission(['admin']), mw.courseInstances.fetchNonHoc)
   app.post('/db/course_instance/-/recent', mw.auth.checkHasPermission(['admin']), mw.courseInstances.fetchRecent)
+  app.get('/db/course_instance/:handle', mw.auth.checkLoggedIn(), mw.courseInstances.getByHandle)
   app.get('/db/course_instance/:handle/levels/:levelOriginal/sessions/:sessionID/next', mw.courseInstances.fetchNextLevel)
   app.get('/db/course_instance/:handle/members', mw.auth.checkLoggedIn(), mw.courseInstances.fetchMembers)
   app.post('/db/course_instance/:handle/members', mw.auth.checkLoggedIn(), mw.courseInstances.addMembers)

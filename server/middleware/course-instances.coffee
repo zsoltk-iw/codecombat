@@ -55,6 +55,19 @@ module.exports =
     courseInstance = yield courseInstance.save()
     res.status(201).send(courseInstance.toObject({req}))
     
+    
+  getByHandle: wrap (req, res) ->
+    courseInstance = yield database.getDocFromHandle(req, CourseInstance)
+    if not courseInstance
+      throw new errors.NotFound('Course instance not found.')
+
+    isOwner = courseInstance.get('ownerID')?.equals req.user?._id
+    isMember = _.any(courseInstance.get('members') or [], (memberID) -> memberID.equals(req.user.get('_id')))
+    if not (isOwner or isMember or req.user.isAdmin())
+      throw new errors.Forbidden('You do not have access to this course instance.')
+
+    res.status(200).send(courseInstance.toObject({req}))
+    
   
   addMembers: wrap (req, res) ->
     if req.body.userID
